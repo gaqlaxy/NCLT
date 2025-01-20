@@ -84,7 +84,7 @@
 //     const scrapeTableData = async () => {
 //         const rows = await page.$$(`${TABLE_SELECTOR} tr`);
 //         console.log(`Found ${rows.length} rows in the table.`);
-        
+
 //         for (let i = 0; i < rows.length; i++) {
 //             const row = rows[i];
 //             const tds = await row.$$('td');
@@ -180,7 +180,6 @@
 //     await browser.close();
 // })();
 
-
 // V2
 // const puppeteer = require('puppeteer');
 // const fs = require('fs');
@@ -268,7 +267,7 @@
 //     const scrapeTableData = async () => {
 //         const rows = await page.$$(`${TABLE_SELECTOR} tr`);
 //         console.log(`Found ${rows.length} rows in the table.`);
-        
+
 //         for (let i = 0; i < rows.length; i++) {
 //             const row = rows[i];
 //             const tds = await row.$$('td');
@@ -377,7 +376,6 @@
 //     await browser.close();
 // })();
 
-
 // V3  Working in single page
 
 // const puppeteer = require('puppeteer');
@@ -424,7 +422,6 @@
 //     await page.goto(TARGET_URL, { waitUntil: 'networkidle2' });
 //     console.log('Please perform manual inputs and hit "Search". Waiting...');
 
-    
 // try {
 //     console.log('Waiting for the table to load...');
 //     await page.waitForSelector('.table.table-borderd tbody', { visible: true, timeout: 60000 }); // Wait up to 60 seconds
@@ -436,7 +433,6 @@
 //     console.log('Saved current page content to "page_debug.html". Please inspect this file to verify the table structure.');
 //     throw new Error('Failed to load the table. Please check the selector or the table loading process.');
 // }
-
 
 //     // Extract table rows
 //     const rows = await page.$$eval('.table.table-borderd tbody tr', (rows) => {
@@ -491,16 +487,177 @@
 
 
 
-// V4 Pagination Checking ------------------------
+// V5
 
-const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
+// const puppeteer = require("puppeteer");
+// const fs = require("fs");
+// const path = require("path");
+// const https = require("https");
 
-const BASE_URL = 'https://nclt.gov.in';
+// const BASE_URL = "https://nclt.gov.in";
+// const TARGET_URL = `${BASE_URL}/order-date-wise`;
+// const DOWNLOAD_DIR = path.join(__dirname, "downloads");
+
+// // Ensure the downloads directory exists
+// if (!fs.existsSync(DOWNLOAD_DIR)) {
+//     fs.mkdirSync(DOWNLOAD_DIR);
+// }
+
+// // Function to download PDFs
+// async function downloadPDF(url, destination) {
+//     return new Promise((resolve, reject) => {
+//         const file = fs.createWriteStream(destination);
+//         https
+//             .get(url, (response) => {
+//                 if (response.statusCode === 200) {
+//                     response.pipe(file);
+//                     file.on("finish", () => {
+//                         file.close(resolve);
+//                     });
+//                 } else {
+//                     reject(`Failed to download PDF: ${response.statusCode}`);
+//                 }
+//             })
+//             .on("error", reject);
+//     });
+// }
+
+// // Function to process a page's table rows and handle PDF downloads
+// async function processTableRows(page, browser) {
+//     const rows = await page.$$eval(".table.table-borderd tbody tr", (rows) => {
+//         return rows.map((row) => {
+//             const tds = row.querySelectorAll("td");
+//             const status = tds[tds.length - 1]?.innerText.trim();
+//             const link = tds[tds.length - 1]?.querySelector("a")?.href;
+//             return { status, link };
+//         });
+//     });
+
+//     for (const [index, row] of rows.entries()) {
+//         const { status, link } = row;
+//         if (status === "Disposed" && link) {
+//             console.log(`Processing row ${index + 1}: ${link}`);
+//             const newTab = await browser.newPage();
+
+//             try {
+//                 await newTab.goto(link, { waitUntil: "networkidle2" });
+
+//                 // Open accordion section
+//                 const cardSelector =
+//                     '.accordion .card:nth-of-type(2) [data-target="#collapseTwo"]';
+//                 await newTab.waitForSelector(cardSelector, { visible: true });
+//                 await newTab.click(cardSelector);
+
+//                 // Wait for table to load
+//                 const pdfLinkSelector =
+//                     "#collapseTwo .table-bordered tbody tr:nth-of-type(1) td:nth-of-type(4) a";
+//                 await newTab.waitForSelector(pdfLinkSelector, { visible: true });
+
+//                 // Extract and download PDF
+//                 const pdfLink = await newTab.$eval(pdfLinkSelector, (a) => a.href);
+//                 console.log(`Downloading PDF: ${pdfLink}`);
+
+//                 const fileName = `case_${index + 1}_${Date.now()}.pdf`;
+//                 const filePath = path.join(DOWNLOAD_DIR, fileName);
+
+//                 await downloadPDF(pdfLink, filePath);
+//                 console.log(`PDF downloaded: ${fileName}`);
+//             } catch (error) {
+//                 console.error(`Error processing row ${index + 1}:`, error);
+//             } finally {
+//                 await newTab.close();
+//             }
+//         } else {
+//             console.log(`Row ${index + 1} skipped: Status is "${status}"`);
+//         }
+//     }
+// }
+
+// // Main Puppeteer logic with pagination
+// (async () => {
+//     const browser = await puppeteer.launch({
+//         headless: false, // Set to false for debugging
+//         defaultViewport: null,
+//         args: ["--start-maximized"],
+//     });
+//     const page = await browser.newPage();
+
+//     // Navigate to the target URL
+//     await page.goto(TARGET_URL, { waitUntil: "networkidle2" });
+//     console.log('Please perform manual inputs and hit "Search". Waiting...');
+
+//     // Wait for user to interact and load results
+//     function delay(time) {
+//         return new Promise((resolve) => setTimeout(resolve, time));
+//     }
+//     await delay(30000); // Adjust this as needed
+
+//     try {
+//         console.log("Waiting for the table to load...");
+//         await page.waitForSelector(".table.table-borderd tbody", {
+//             visible: true,
+//             timeout: 60000,
+//         });
+//         console.log("Table loaded. Starting scraping...");
+
+//         while (true) {
+//             // Process the current page
+//             await processTableRows(page, browser);
+
+//             // Check if the "Next" button is available
+//             console.log("Page object:", page);
+
+//             // almost worked
+//             const nextButton = await page.evaluateHandle(() => {
+//                 const button = [
+//                     ...document.querySelectorAll("ul.pagination a.page-link"),
+//                 ].find((el) => el.textContent.trim() === "Next");
+//                 return button || null;
+//             });
+
+//             if (nextButton) {
+//                 console.log("Next button found. Clicking it...");
+//                 await nextButton.click();
+//                 await page.waitForTimeout(2000); // Adjust timeout if needed
+//                 console.log("Navigated to the next page.");
+//             } else {
+//                 console.log("Next button not found. Exiting pagination.");
+//             }
+
+//             if (nextButton.length === 0) {
+//                 console.log('No "Next" button found. Exiting pagination.');
+//                 console.log(`Current page URL: ${page.url()}`);
+//                 break;
+//             }
+
+//             // Click the 'Next' button and wait for the next page to load
+//             console.log("Navigating to the next page...");
+//             await nextButton[0].click();
+//             await page.waitForTimeout(2000); // Adjust the timeout if necessary
+//             await page.waitForSelector(".table.table-borderd tbody", {
+//                 visible: true,
+//             });
+//         }
+
+//         console.log("Scraping completed.");
+//     } catch (error) {
+//         console.error("Error during scraping:", error);
+//     } finally {
+//         await browser.close();
+//     }
+// })();
+
+
+// V6 
+
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
+const https = require("https");
+
+const BASE_URL = "https://nclt.gov.in";
 const TARGET_URL = `${BASE_URL}/order-date-wise`;
-const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
+const DOWNLOAD_DIR = path.join(__dirname, "downloads");
 
 // Ensure the downloads directory exists
 if (!fs.existsSync(DOWNLOAD_DIR)) {
@@ -511,46 +668,50 @@ if (!fs.existsSync(DOWNLOAD_DIR)) {
 async function downloadPDF(url, destination) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(destination);
-        https.get(url, (response) => {
-            if (response.statusCode === 200) {
-                response.pipe(file);
-                file.on('finish', () => {
-                    file.close(resolve);
-                });
-            } else {
-                reject(`Failed to download PDF: ${response.statusCode}`);
-            }
-        }).on('error', reject);
+        https
+            .get(url, (response) => {
+                if (response.statusCode === 200) {
+                    response.pipe(file);
+                    file.on("finish", () => {
+                        file.close(resolve);
+                    });
+                } else {
+                    reject(`Failed to download PDF: ${response.statusCode}`);
+                }
+            })
+            .on("error", reject);
     });
 }
 
 // Function to process a page's table rows and handle PDF downloads
 async function processTableRows(page, browser) {
-    const rows = await page.$$eval('.table.table-borderd tbody tr', (rows) => {
+    const rows = await page.$$eval(".table.table-borderd tbody tr", (rows) => {
         return rows.map((row) => {
-            const tds = row.querySelectorAll('td');
+            const tds = row.querySelectorAll("td");
             const status = tds[tds.length - 1]?.innerText.trim();
-            const link = tds[tds.length - 1]?.querySelector('a')?.href;
+            const link = tds[tds.length - 1]?.querySelector("a")?.href;
             return { status, link };
         });
     });
 
     for (const [index, row] of rows.entries()) {
         const { status, link } = row;
-        if (status === 'Disposed' && link) {
+        if (status === "Disposed" && link) {
             console.log(`Processing row ${index + 1}: ${link}`);
             const newTab = await browser.newPage();
 
             try {
-                await newTab.goto(link, { waitUntil: 'networkidle2' });
+                await newTab.goto(link, { waitUntil: "networkidle2" });
 
                 // Open accordion section
-                const cardSelector = '.accordion .card:nth-of-type(2) [data-target="#collapseTwo"]';
+                const cardSelector =
+                    '.accordion .card:nth-of-type(2) [data-target="#collapseTwo"]';
                 await newTab.waitForSelector(cardSelector, { visible: true });
                 await newTab.click(cardSelector);
 
                 // Wait for table to load
-                const pdfLinkSelector = '#collapseTwo .table-bordered tbody tr:nth-of-type(1) td:nth-of-type(4) a';
+                const pdfLinkSelector =
+                    "#collapseTwo .table-bordered tbody tr:nth-of-type(1) td:nth-of-type(4) a";
                 await newTab.waitForSelector(pdfLinkSelector, { visible: true });
 
                 // Extract and download PDF
@@ -573,63 +734,64 @@ async function processTableRows(page, browser) {
     }
 }
 
+// Delay function
+function delay(time) {
+    return new Promise((resolve) => setTimeout(resolve, time));
+}
+
 // Main Puppeteer logic with pagination
 (async () => {
     const browser = await puppeteer.launch({
         headless: false, // Set to false for debugging
         defaultViewport: null,
-        args: ['--start-maximized']
+        args: ["--start-maximized"],
     });
     const page = await browser.newPage();
 
     // Navigate to the target URL
-    await page.goto(TARGET_URL, { waitUntil: 'networkidle2' });
+    await page.goto(TARGET_URL, { waitUntil: "networkidle2" });
     console.log('Please perform manual inputs and hit "Search". Waiting...');
 
     // Wait for user to interact and load results
-    function delay(time) {
-        return new Promise((resolve) => setTimeout(resolve, time));
-    }
     await delay(30000); // Adjust this as needed
 
     try {
-        console.log('Waiting for the table to load...');
-        await page.waitForSelector('.table.table-borderd tbody', { visible: true, timeout: 60000 });
-        console.log('Table loaded. Starting scraping...');
+        console.log("Waiting for the table to load...");
+        await page.waitForSelector(".table.table-borderd tbody", {
+            visible: true,
+            timeout: 60000,
+        });
+        console.log("Table loaded. Starting scraping...");
 
         while (true) {
             // Process the current page
             await processTableRows(page, browser);
 
-            // Check if the 'Next' button is disabled
-            const nextButton = await page.$('ul.pagination li.next');
-            if (!nextButton) {
-                console.log('No "Next" button found. Exiting pagination.');
-                console.log(`Current page URL: ${page.url()}`);
+            // Check if the "Next" button is available
+            const nextButton = await page.evaluateHandle(() => {
+                return [...document.querySelectorAll("ul.pagination a.page-link")].find(
+                    (el) => el.textContent.trim() === "Next"
+                ) || null;
+            });
 
+            if (nextButton) {
+                console.log("Next button found. Clicking it...");
+                await nextButton.evaluate((btn) => btn.scrollIntoView());
+                await nextButton.click();
+                await delay(2000); // Adjust timeout if needed
+                console.log("Navigated to the next page.");
+            } else {
+                console.log("Next button not found. Exiting pagination.");
                 break;
             }
 
-            const isNextDisabled = await nextButton.evaluate((node) =>
-                node.classList.contains('disabled')
-            );
-            console.log(`Is 'Next' button disabled: ${isNextDisabled}`);
-
-            if (isNextDisabled) {
-                console.log('Reached the last page. Exiting pagination.');
-                break;
-            }
-
-            // Click the 'Next' button and wait for the next page to load
-            console.log('Navigating to the next page...');
-            await nextButton.click();
-            await page.waitForTimeout(2000); // Adjust the timeout if necessary
-            await page.waitForSelector('.table.table-borderd tbody', { visible: true });
+            // Wait for the next page's table to load
+            await page.waitForSelector(".table.table-borderd tbody", { visible: true });
         }
 
-        console.log('Scraping completed.');
+        console.log("Scraping completed.");
     } catch (error) {
-        console.error('Error during scraping:', error);
+        console.error("Error during scraping:", error);
     } finally {
         await browser.close();
     }
