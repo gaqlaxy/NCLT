@@ -654,7 +654,6 @@ const puppeteer = require("puppeteer");
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
-
 const BASE_URL = "https://nclt.gov.in";
 const TARGET_URL = `${BASE_URL}/order-date-wise`;
 const DOWNLOAD_DIR = path.join(__dirname, "downloads");
@@ -763,31 +762,63 @@ function delay(time) {
         });
         console.log("Table loaded. Starting scraping...");
 
+      
+
         while (true) {
             // Process the current page
             await processTableRows(page, browser);
 
-            // Check if the "Next" button is available
+            // Check if the "Next" button is available and not disabled
             const nextButton = await page.evaluateHandle(() => {
-                return [...document.querySelectorAll("ul.pagination a.page-link")].find(
+                const nextEl = [...document.querySelectorAll("ul.pagination a.page-link")].find(
                     (el) => el.textContent.trim() === "Next"
-                ) || null;
+                );
+                if (nextEl && !nextEl.closest("li").classList.contains("disabled")) {
+                    return nextEl;
+                }
+                return null;
             });
 
             if (nextButton) {
                 console.log("Next button found. Clicking it...");
-                await nextButton.evaluate((btn) => btn.scrollIntoView());
-                await nextButton.click();
-                await delay(2000); // Adjust timeout if needed
-                console.log("Navigated to the next page.");
+                try {
+                    // Verify the button still exists before interaction
+                    const isValid = await nextButton.evaluate((btn) => btn !== null);
+                    if (!isValid) {
+                        console.error("Next button became invalid. Exiting pagination.");
+                        break;
+                    }
+
+                    // Scroll into view and click the button
+                    await nextButton.evaluate((btn) => btn.scrollIntoView());
+                    await Promise.all([
+                        nextButton.evaluate((btn) => btn.click()),
+                        page.waitForNavigation({ waitUntil: "networkidle2" }),
+                    ]);
+                    console.log("Navigated to the next page.");
+                } catch (clickError) {
+                    console.error("Error clicking the 'Next' button:", clickError);
+                    break;
+                }
             } else {
-                console.log("Next button not found. Exiting pagination.");
+                console.log('No "Next" button available or it is disabled. Exiting pagination.');
                 break;
             }
 
-            // Wait for the next page's table to load
-            await page.waitForSelector(".table.table-borderd tbody", { visible: true });
+            // Confirm the table has loaded on the new page
+            try {
+                await page.waitForSelector(".table.table-borderd tbody", {
+                    visible: true,
+                    timeout: 60000,
+                });
+                console.log("Table loaded on the new page.");
+            } catch (waitError) {
+                console.error("Error waiting for the table to load on the new page:", waitError);
+                break;
+            }
         }
+
+
 
         console.log("Scraping completed.");
     } catch (error) {
